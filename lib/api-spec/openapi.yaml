@@ -1,0 +1,444 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: GhostTrade Private API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: market
+    description: Market data operations
+  - name: analyze
+    description: FHE analysis operations
+  - name: openrouter
+    description: OpenRouter AI chat operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /market-data/{symbol}:
+    get:
+      operationId: getMarketData
+      tags: [market]
+      summary: Get market data for a symbol
+      description: Fetches real-time market data from CoinGecko for the given asset symbol
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Market data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketData"
+        "400":
+          description: Invalid symbol
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Market data fetch failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /market-data:
+    get:
+      operationId: getAllMarketData
+      tags: [market]
+      summary: Get market data for all supported assets
+      description: Fetches real-time market data for BTC, ETH, and SOL
+      responses:
+        "200":
+          description: All market data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketData"
+        "500":
+          description: Market data fetch failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /analyze:
+    post:
+      operationId: analyzeAsset
+      tags: [analyze]
+      summary: Run FHE analysis on an asset
+      description: Fetches fresh market data and runs it through the FHE pipeline to generate a trading signal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeRequest"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /openrouter/conversations:
+    get:
+      operationId: listOpenrouterConversations
+      tags: [openrouter]
+      summary: List all conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenrouterConversation"
+    post:
+      operationId: createOpenrouterConversation
+      tags: [openrouter]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpenrouterConversationBody"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenrouterConversation"
+  /openrouter/conversations/{id}:
+    get:
+      operationId: getOpenrouterConversation
+      tags: [openrouter]
+      summary: Get conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenrouterConversationWithMessages"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenrouterError"
+    delete:
+      operationId: deleteOpenrouterConversation
+      tags: [openrouter]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenrouterError"
+  /openrouter/conversations/{id}/messages:
+    get:
+      operationId: listOpenrouterMessages
+      tags: [openrouter]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenrouterMessage"
+    post:
+      operationId: sendOpenrouterMessage
+      tags: [openrouter]
+      summary: Send a message and receive an AI response (SSE stream)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendOpenrouterMessageBody"
+      responses:
+        "200":
+          description: SSE stream of assistant response chunks
+          content:
+            text/event-stream: {}
+
+components:
+  schemas:
+    OpenrouterConversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - createdAt
+    OpenrouterMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+    CreateOpenrouterConversationBody:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+        - title
+    SendOpenrouterMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+    OpenrouterConversationWithMessages:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenrouterMessage"
+      required:
+        - id
+        - title
+        - createdAt
+        - messages
+    OpenrouterError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    IndexData:
+      type: object
+      properties:
+        ssiMAG7:
+          type: number
+          description: Simulated SoSoValue MAG7 index (weighted BTC + ETH)
+        ssiDeFi:
+          type: number
+          description: Simulated SoSoValue DeFi index (average DeFi tokens)
+      required:
+        - ssiMAG7
+        - ssiDeFi
+
+    MarketData:
+      type: object
+      properties:
+        symbol:
+          type: string
+        price:
+          type: number
+        change24h:
+          type: number
+          description: 24h price change percentage
+        volume:
+          type: number
+          description: 24h trading volume in USD
+        marketCap:
+          type: number
+          description: Market capitalization in USD
+        sentimentScore:
+          type: number
+          description: Computed sentiment score between 0 and 1
+        indexData:
+          $ref: "#/components/schemas/IndexData"
+        provider:
+          type: string
+          description: Data provider name (e.g. CoinGecko)
+        fetchedAt:
+          type: string
+          description: ISO timestamp when data was fetched
+      required:
+        - symbol
+        - price
+        - change24h
+        - volume
+        - marketCap
+        - sentimentScore
+        - indexData
+        - provider
+        - fetchedAt
+
+    AnalyzeRequest:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: Asset symbol (BTC, ETH, SOL)
+        walletConnected:
+          type: boolean
+          description: Whether a MetaMask wallet is connected (enables real FHE mode)
+      required:
+        - symbol
+
+    FheStep:
+      type: object
+      properties:
+        step:
+          type: string
+        description:
+          type: string
+        ciphertextPreview:
+          type: ["string", "null"]
+      required:
+        - step
+        - description
+
+    AnalysisResult:
+      type: object
+      properties:
+        signal:
+          type: string
+          description: Trading signal - BUY, SELL, or HOLD
+        confidence:
+          type: number
+          description: Confidence percentage (0-100)
+        explanation:
+          type: string
+          description: AI-style reasoning for the signal
+        fheMode:
+          type: string
+          description: FHE mode - simulation or real
+        fheModeLabel:
+          type: string
+          description: Human-readable FHE mode label
+        marketData:
+          $ref: "#/components/schemas/MarketData"
+        fheSteps:
+          type: array
+          items:
+            $ref: "#/components/schemas/FheStep"
+          description: Step-by-step FHE pipeline trace
+        encryptedInputsPreview:
+          type: string
+          description: Preview of the encrypted ciphertext inputs
+        decryptedOutput:
+          type: string
+          description: The final decrypted signal output
+      required:
+        - signal
+        - confidence
+        - explanation
+        - fheMode
+        - fheModeLabel
+        - marketData
+        - fheSteps
+        - encryptedInputsPreview
+        - decryptedOutput
