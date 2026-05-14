@@ -43,6 +43,8 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
+dangerouslyAllowAllBuilds: true
+
 overrides:
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"
